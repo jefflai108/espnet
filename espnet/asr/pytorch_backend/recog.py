@@ -95,7 +95,7 @@ def recog_v2(args):
         sos=model.sos,
         eos=model.eos,
         token_list=train_args.char_list,
-        pre_beam_score_key=None if args.ctc_weight == 1.0 else "full",
+        pre_beam_score_key=None if args.ctc_weight == 1.0 else "decoder",
     )
     # TODO(karita): make all scorers batchfied
     if args.batchsize == 1:
@@ -127,6 +127,11 @@ def recog_v2(args):
     # read json data
     with open(args.recog_json, "rb") as f:
         js = json.load(f)["utts"]
+    for k, v in js.items():
+        print(v['output'][0]['tokenid'])
+        print(v['output'][0]['text'])
+        #assert len(v['output'][0]['tokenid']) == len(v['output'][0]['text'])
+
     new_js = {}
     with torch.no_grad():
         for idx, name in enumerate(js.keys(), 1):
@@ -143,6 +148,7 @@ def recog_v2(args):
             new_js[name] = add_results_to_json(
                 js[name], nbest_hyps, train_args.char_list
             )
+            print(new_js[name])
 
     with open(args.result_label, "wb") as f:
         f.write(

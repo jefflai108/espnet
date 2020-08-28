@@ -519,7 +519,6 @@ class E2E(ASRInterface, torch.nn.Module):
             2) other case => attention weights (B, Lmax, Tmax).
 
         """
-        self.eval()
         if (
             self.etype == "transformer"
             and self.dtype != "transformer"
@@ -545,5 +544,5 @@ class E2E(ASRInterface, torch.nn.Module):
                 for name, m in self.named_modules():
                     if isinstance(m, MultiHeadedAttention):
                         ret[name] = m.attn.cpu().numpy()
-        self.train()
+
         return ret

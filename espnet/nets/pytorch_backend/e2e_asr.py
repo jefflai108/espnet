@@ -55,6 +55,27 @@ class Reporter(chainer.Chain):
         logging.info("mtl loss:" + str(mtl_loss))
         reporter.report({"loss": mtl_loss}, self)
 
+class Reporter2(chainer.Chain):
+    """A chainer reporter wrapper."""
+
+    def report(self, loss_ctc_data, loss_ctc_data2, loss_att_data, loss_att_data2,
+               combined_loss_ctc, combined_loss_att, cer_ctc, cer, wer,
+               acc, acc2, joint_loss):
+        """Report at every step."""
+        reporter.report({"loss_ctc_data": loss_ctc_data}, self)
+        reporter.report({"loss_ctc_data2": loss_ctc_data2}, self)
+        reporter.report({"loss_att_data": loss_att_data}, self)
+        reporter.report({"loss_att_data2": loss_att_data2}, self)
+        reporter.report({"combined_loss_ctc": combined_loss_ctc}, self)
+        reporter.report({"combined_loss_att": combined_loss_att}, self)
+        reporter.report({"cer_ctc": cer_ctc}, self)
+        reporter.report({"cer": cer}, self)
+        reporter.report({"wer": wer}, self)
+        reporter.report({"acc": acc}, self)
+        reporter.report({"acc2": acc2}, self)
+        logging.info("joint loss:" + str(joint_loss))
+        reporter.report({"joint_loss": joint_loss}, self)
+
 
 class E2E(ASRInterface, torch.nn.Module):
     """E2E module.
@@ -527,7 +548,7 @@ class E2E(ASRInterface, torch.nn.Module):
         return y
 
     def recognize_batch(self, xs, recog_args, char_list, rnnlm=None):
-        """E2E batch beam search.
+        """E2E beam search.
 
         :param list xs: list of input acoustic feature arrays [(T_1, D), (T_2, D), ...]
         :param Namespace recog_args: argument Namespace containing options
@@ -612,7 +633,6 @@ class E2E(ASRInterface, torch.nn.Module):
             2) other case => attention weights (B, Lmax, Tmax).
         :rtype: float ndarray
         """
-        self.eval()
         with torch.no_grad():
             # 0. Frontend
             if self.frontend is not None:
@@ -626,38 +646,8 @@ class E2E(ASRInterface, torch.nn.Module):
 
             # 2. Decoder
             att_ws = self.dec.calculate_all_attentions(hpad, hlens, ys_pad)
-        self.train()
+
         return att_ws
-
-    def calculate_all_ctc_probs(self, xs_pad, ilens, ys_pad):
-        """E2E CTC probability calculation.
-
-        :param torch.Tensor xs_pad: batch of padded input sequences (B, Tmax)
-        :param torch.Tensor ilens: batch of lengths of input sequences (B)
-        :param torch.Tensor ys_pad: batch of padded token id sequence tensor (B, Lmax)
-        :return: CTC probability (B, Tmax, vocab)
-        :rtype: float ndarray
-        """
-        probs = None
-        if self.mtlalpha == 0:
-            return probs
-
-        self.eval()
-        with torch.no_grad():
-            # 0. Frontend
-            if self.frontend is not None:
-                hs_pad, hlens, mask = self.frontend(to_torch_tensor(xs_pad), ilens)
-                hs_pad, hlens = self.feature_transform(hs_pad, hlens)
-            else:
-                hs_pad, hlens = xs_pad, ilens
-
-            # 1. Encoder
-            hpad, hlens, _ = self.enc(hs_pad, hlens)
-
-            # 2. CTC probs
-            probs = self.ctc.softmax(hpad).cpu().numpy()
-        self.train()
-        return probs
 
     def subsample_frames(self, x):
         """Subsample speeh frames in the encoder."""

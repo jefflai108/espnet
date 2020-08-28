@@ -114,6 +114,7 @@ def batchfy_by_bin(
     if batch_bins <= 0:
         raise ValueError(f"invalid batch_bins={batch_bins}")
     length = len(sorted_data)
+    print(length)
     idim = int(sorted_data[0][1][ikey][0]["shape"][1])
     odim = int(sorted_data[0][1][okey][0]["shape"][1])
     logging.info("# utts: " + str(len(sorted_data)))
@@ -456,6 +457,7 @@ def make_batchset(
         )
         logging.info("# utts: " + str(len(sorted_data)))
         if count == "seq":
+            print('batchfy is seq')
             batches = batchfy_by_seq(
                 sorted_data,
                 batch_size=batch_size,
@@ -469,6 +471,7 @@ def make_batchset(
                 oaxis=oaxis,
             )
         if count == "bin":
+            print('batchfy is bin')
             batches = batchfy_by_bin(
                 sorted_data,
                 batch_bins=batch_bins,
@@ -478,6 +481,7 @@ def make_batchset(
                 okey=okey,
             )
         if count == "frame":
+            print('batchfy is frame')
             batches = batchfy_by_frame(
                 sorted_data,
                 max_frames_in=batch_frames_in,

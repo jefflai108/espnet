@@ -26,8 +26,6 @@ from espnet.nets.pytorch_backend.transformer.positionwise_feed_forward import (
 )
 from espnet.nets.pytorch_backend.transformer.repeat import repeat
 from espnet.nets.pytorch_backend.transformer.subsampling import Conv2dSubsampling
-from espnet.nets.pytorch_backend.transformer.subsampling import Conv2dSubsampling6
-from espnet.nets.pytorch_backend.transformer.subsampling import Conv2dSubsampling8
 
 
 def _pre_hook(
@@ -104,17 +102,6 @@ class Encoder(torch.nn.Module):
             )
         elif input_layer == "conv2d":
             self.embed = Conv2dSubsampling(idim, attention_dim, dropout_rate)
-        elif input_layer == "conv2d-scaled-pos-enc":
-            self.embed = Conv2dSubsampling(
-                idim,
-                attention_dim,
-                dropout_rate,
-                pos_enc_class(attention_dim, positional_dropout_rate),
-            )
-        elif input_layer == "conv2d6":
-            self.embed = Conv2dSubsampling6(idim, attention_dim, dropout_rate)
-        elif input_layer == "conv2d8":
-            self.embed = Conv2dSubsampling8(idim, attention_dim, dropout_rate)
         elif input_layer == "vgg2l":
             self.embed = VGG2L(idim, attention_dim)
         elif input_layer == "embed":
@@ -124,8 +111,7 @@ class Encoder(torch.nn.Module):
             )
         elif isinstance(input_layer, torch.nn.Module):
             self.embed = torch.nn.Sequential(
-                input_layer,
-                pos_enc_class(attention_dim, positional_dropout_rate),
+                input_layer, pos_enc_class(attention_dim, positional_dropout_rate),
             )
         elif input_layer is None:
             self.embed = torch.nn.Sequential(
@@ -134,13 +120,27 @@ class Encoder(torch.nn.Module):
         else:
             raise ValueError("unknown input_layer: " + input_layer)
         self.normalize_before = normalize_before
-        positionwise_layer, positionwise_layer_args = self.get_positionwise_layer(
-            positionwise_layer_type,
-            attention_dim,
-            linear_units,
-            dropout_rate,
-            positionwise_conv_kernel_size,
-        )
+        if positionwise_layer_type == "linear":
+            positionwise_layer = PositionwiseFeedForward
+            positionwise_layer_args = (attention_dim, linear_units, dropout_rate)
+        elif positionwise_layer_type == "conv1d":
+            positionwise_layer = MultiLayeredConv1d
+            positionwise_layer_args = (
+                attention_dim,
+                linear_units,
+                positionwise_conv_kernel_size,
+                dropout_rate,
+            )
+        elif positionwise_layer_type == "conv1d-linear":
+            positionwise_layer = Conv1dLinear
+            positionwise_layer_args = (
+                attention_dim,
+                linear_units,
+                positionwise_conv_kernel_size,
+                dropout_rate,
+            )
+        else:
+            raise NotImplementedError("Support only linear or conv1d.")
         if selfattention_layer_type == "selfattn":
             logging.info("encoder self-attention layer type = self-attention")
             self.encoders = repeat(
@@ -244,38 +244,6 @@ class Encoder(torch.nn.Module):
         if self.normalize_before:
             self.after_norm = LayerNorm(attention_dim)
 
-    def get_positionwise_layer(
-        self,
-        positionwise_layer_type="linear",
-        attention_dim=256,
-        linear_units=2048,
-        dropout_rate=0.1,
-        positionwise_conv_kernel_size=1,
-    ):
-        """Define positionwise layer."""
-        if positionwise_layer_type == "linear":
-            positionwise_layer = PositionwiseFeedForward
-            positionwise_layer_args = (attention_dim, linear_units, dropout_rate)
-        elif positionwise_layer_type == "conv1d":
-            positionwise_layer = MultiLayeredConv1d
-            positionwise_layer_args = (
-                attention_dim,
-                linear_units,
-                positionwise_conv_kernel_size,
-                dropout_rate,
-            )
-        elif positionwise_layer_type == "conv1d-linear":
-            positionwise_layer = Conv1dLinear
-            positionwise_layer_args = (
-                attention_dim,
-                linear_units,
-                positionwise_conv_kernel_size,
-                dropout_rate,
-            )
-        else:
-            raise NotImplementedError("Support only linear or conv1d.")
-        return positionwise_layer, positionwise_layer_args
-
     def forward(self, xs, masks):
         """Encode input sequence.
 
@@ -284,10 +252,7 @@ class Encoder(torch.nn.Module):
         :return: position embedded tensor and mask
         :rtype Tuple[torch.Tensor, torch.Tensor]:
         """
-        if isinstance(
-            self.embed,
-            (Conv2dSubsampling, Conv2dSubsampling6, Conv2dSubsampling8, VGG2L),
-        ):
+        if isinstance(self.embed, (Conv2dSubsampling, VGG2L)):
             xs, masks = self.embed(xs, masks)
         else:
             xs = self.embed(xs)

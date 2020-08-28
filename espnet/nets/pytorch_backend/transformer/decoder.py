@@ -258,13 +258,24 @@ class Decoder(BatchScorerInterface, torch.nn.Module):
         :rtype: torch.Tensor
         """
         x = self.embed(tgt)
+        #print('indisider the decoder!!')
+        #print(x.shape) # torch.Size([1, 9, 512])
         x, tgt_mask, memory, memory_mask = self.decoders(
             x, tgt_mask, memory, memory_mask
         )
+        #print(x.shape)
         if self.normalize_before:
             x = self.after_norm(x)
+
+        x_before_output = x
+
+        #print(x_before_output.shape)
         if self.output_layer is not None:
             x = self.output_layer(x)
+        #print(x.shape) # torch.Size([1, 9, 655])
+        #print(tgt_mask)
+        #print(tgt_mask.shape) ## torch.Size([1, 9, 9])
+        #print('exiting decoder!!')
         return x, tgt_mask
 
     def forward_one_step(self, tgt, tgt_mask, memory, cache=None):
@@ -291,10 +302,14 @@ class Decoder(BatchScorerInterface, torch.nn.Module):
             )
             new_cache.append(x)
 
+        #print(x.shape)
         if self.normalize_before:
             y = self.after_norm(x[:, -1])
         else:
             y = x[:, -1]
+        #print(y.shape)
+        y_before_output = y
+
         if self.output_layer is not None:
             y = torch.log_softmax(self.output_layer(y), dim=-1)
 
